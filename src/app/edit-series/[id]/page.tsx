@@ -2,16 +2,15 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 
-type Episode = {
-  id: number;
-  season: number;
-  episode: number;
-  streamUrl: string;
-};
-
 export default function EditSeries() {
-  const [seriesForm, setSeriesForm] = useState({ name: "", language: "", imageUrl: "", tmdbLink: "" });
-  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [series, setSeries] = useState({
+    name: "",
+    ott: "",
+    language: "",
+    imageUrl: "",
+    tmdbLink: "",
+  });
+  const [episodes, setEpisodes] = useState([{ season: 1, episode: 1, streamUrl: "" }]);
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
@@ -20,22 +19,37 @@ export default function EditSeries() {
     fetch(`/api/series/${id}`)
       .then((res) => res.json())
       .then((data) => {
-        setSeriesForm({ name: data.name, language: data.language, imageUrl: data.imageUrl, tmdbLink: data.tmdbLink });
-        setEpisodes(data.episodes);
+        setSeries({
+          name: data.name,
+          ott: data.ott,
+          language: data.language || "",
+          imageUrl: data.imageUrl,
+          tmdbLink: data.tmdbLink || "",
+        });
+        setEpisodes(
+          data.episodes.map((ep: { season: number; episode: number; streamUrl: string }) => ({
+            season: ep.season,
+            episode: ep.episode,
+            streamUrl: ep.streamUrl,
+          }))
+        );
       });
   }, [id]);
 
   const addEpisode = () => {
-    const lastEpisode = episodes[episodes.length - 1] || { season: 1, episode: 0 };
-    setEpisodes([...episodes, { id: 0, season: lastEpisode.season, episode: lastEpisode.episode + 1, streamUrl: "" }]);
+    const lastEpisode = episodes[episodes.length - 1];
+    setEpisodes([
+      ...episodes,
+      { season: lastEpisode.season, episode: lastEpisode.episode + 1, streamUrl: "" },
+    ]);
   };
 
   const addSeason = () => {
-    const lastEpisode = episodes[episodes.length - 1] || { season: 0, episode: 1 };
-    setEpisodes([...episodes, { id: 0, season: lastEpisode.season + 1, episode: 1, streamUrl: "" }]);
+    const lastEpisode = episodes[episodes.length - 1];
+    setEpisodes([...episodes, { season: lastEpisode.season + 1, episode: 1, streamUrl: "" }]);
   };
 
-  const handleEpisodeChange = (index: number, field: string, value: string | number) => {
+  const updateEpisode = (index: number, field: string, value: string | number) => {
     const newEpisodes = [...episodes];
     newEpisodes[index] = { ...newEpisodes[index], [field]: value };
     setEpisodes(newEpisodes);
@@ -46,43 +60,26 @@ export default function EditSeries() {
     const res = await fetch(`/api/series/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(seriesForm),
+      body: JSON.stringify({
+        ...series,
+        episodes,
+      }),
     });
     if (res.ok) {
-      router.push("/index");
+      router.push("/content-index");
     } else {
       alert("Failed to update series");
     }
   };
 
-  const handleEpisodeSubmit = async (episode: Episode, index: number) => {
-    if (episode.id === 0) {
-      // Create new episode
-      const res = await fetch(`/api/series/${id}/episodes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ season: episode.season, episode: episode.episode, streamUrl: episode.streamUrl }),
-      });
-      if (res.ok) {
-        const newEpisode = await res.json();
-        const newEpisodes = [...episodes];
-        newEpisodes[index] = newEpisode;
-        setEpisodes(newEpisodes);
-      } else {
-        alert("Failed to create episode");
-      }
-    } else {
-      // Update existing episode
-      const res = await fetch(`/api/episodes/${episode.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ season: episode.season, episode: episode.episode, streamUrl: episode.streamUrl }),
-      });
-      if (!res.ok) {
-        alert("Failed to update episode");
-      }
+  // Group episodes by season
+  const episodesBySeason: { [key: number]: typeof episodes } = {};
+  episodes.forEach((ep) => {
+    if (!episodesBySeason[ep.season]) {
+      episodesBySeason[ep.season] = [];
     }
-  };
+    episodesBySeason[ep.season].push(ep);
+  });
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -92,79 +89,110 @@ export default function EditSeries() {
           <input
             type="text"
             placeholder="Name"
-            value={seriesForm.name}
-            onChange={(e) => setSeriesForm({ ...seriesForm, name: e.target.value })}
+            value={series.name}
+            onChange={(e) => setSeries({ ...series, name: e.target.value })}
             className="w-full p-2 mb-4 border rounded"
             required
           />
           <input
             type="text"
-            placeholder="Language"
-            value={seriesForm.language}
-            onChange={(e) => setSeriesForm({ ...seriesForm, language: e.target.value })}
+            placeholder="OTT (e.g., Netflix)"
+            value={series.ott}
+            onChange={(e) => setSeries({ ...series, ott: e.target.value })}
             className="w-full p-2 mb-4 border rounded"
             required
+          />
+          <input
+            type="text"
+            placeholder="Language (optional)"
+            value={series.language}
+            onChange={(e) => setSeries({ ...series, language: e.target.value })}
+            className="w-full p-2 mb-4 border rounded"
           />
           <input
             type="text"
             placeholder="Image URL"
-            value={seriesForm.imageUrl}
-            onChange={(e) => setSeriesForm({ ...seriesForm, imageUrl: e.target.value })}
+            value={series.imageUrl}
+            onChange={(e) => setSeries({ ...series, imageUrl: e.target.value })}
             className="w-full p-2 mb-4 border rounded"
             required
           />
           <input
             type="text"
             placeholder="TMDB Link (optional)"
-            value={seriesForm.tmdbLink}
-            onChange={(e) => setSeriesForm({ ...seriesForm, tmdbLink: e.target.value })}
+            value={series.tmdbLink}
+            onChange={(e) => setSeries({ ...series, tmdbLink: e.target.value })}
             className="w-full p-2 mb-4 border rounded"
           />
-          <button type="submit" className="w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <h3 className="text-xl font-semibold mb-2">Series Data</h3>
+          {Object.keys(episodesBySeason)
+            .map(Number)
+            .sort()
+            .map((season) => (
+              <div key={season} className="mb-6">
+                <h4 className="text-lg font-medium mb-2">Season {season}</h4>
+                {episodesBySeason[season].map((ep) => (
+                  <div key={`${season}-${ep.episode}`} className="mb-4 pl-4 border-l-2 border-gray-200">
+                    <input
+                      type="number"
+                      placeholder="Episode"
+                      value={ep.episode}
+                      onChange={(e) =>
+                        updateEpisode(
+                          episodes.findIndex(
+                            (e) => e.season === ep.season && e.episode === ep.episode
+                          ),
+                          "episode",
+                          parseInt(e.target.value)
+                        )
+                      }
+                      className="w-full p-2 mb-2 border rounded"
+                      min="1"
+                      required
+                    />
+                    <input
+                      type="text"
+                      placeholder="Stream URL"
+                      value={ep.streamUrl}
+                      onChange={(e) =>
+                        updateEpisode(
+                          episodes.findIndex(
+                            (e) => e.season === ep.season && e.episode === ep.episode
+                          ),
+                          "streamUrl",
+                          e.target.value
+                        )
+                      }
+                      className="w-full p-2 mb-2 border rounded"
+                      required
+                    />
+                  </div>
+                ))}
+              </div>
+            ))}
+          <div className="flex gap-2 mb-4">
+            <button
+              type="button"
+              onClick={addEpisode}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              + Add Episode
+            </button>
+            <button
+              type="button"
+              onClick={addSeason}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              + Add Season
+            </button>
+          </div>
+          <button
+            type="submit"
+            className="w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
             Update Series
           </button>
         </form>
-        <h3 className="text-xl font-semibold mb-2 mt-6">Episodes</h3>
-        {episodes.map((ep, index) => (
-          <div key={index} className="mb-4">
-            <input
-              type="number"
-              placeholder="Season"
-              value={ep.season}
-              onChange={(e) => handleEpisodeChange(index, "season", parseInt(e.target.value))}
-              className="w-full p-2 mb-2 border rounded"
-              required
-            />
-            <input
-              type="number"
-              placeholder="Episode"
-              value={ep.episode}
-              onChange={(e) => handleEpisodeChange(index, "episode", parseInt(e.target.value))}
-              className="w-full p-2 mb-2 border rounded"
-              required
-            />
-            <input
-              type="text"
-              placeholder="Stream URL"
-              value={ep.streamUrl}
-              onChange={(e) => handleEpisodeChange(index, "streamUrl", e.target.value)}
-              className="w-full p-2 mb-2 border rounded"
-              required
-            />
-            <button
-              onClick={() => handleEpisodeSubmit(ep, index)}
-              className="w-full p-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-            >
-              {ep.id === 0 ? "Create Episode" : "Update Episode"}
-            </button>
-          </div>
-        ))}
-        <button onClick={addEpisode} className="w-full p-2 mb-2 bg-green-600 text-white rounded hover:bg-green-700">
-          Add Episode
-        </button>
-        <button onClick={addSeason} className="w-full p-2 mb-4 bg-purple-600 text-white rounded hover:bg-purple-700">
-          Add Season
-        </button>
       </div>
     </div>
   );

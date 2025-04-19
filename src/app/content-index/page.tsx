@@ -3,29 +3,41 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-type Movie = { id: number; name: string; year: number; language: string; imageUrl: string; tmdbLink: string | null; streamUrl: string };
+type Movie = {
+  id: number;
+  name: string;
+  year: number;
+  language: string;
+  imageUrl: string;
+  tmdbLink: string | null;
+  streamUrl: string;
+};
 type Episode = { id: number; season: number; episode: number; streamUrl: string };
-type Series = { id: number; name: string; language: string; imageUrl: string; tmdbLink: string | null; episodes: Episode[] };
+type Series = {
+  id: number;
+  name: string;
+  ott: string;
+  language: string | null;
+  imageUrl: string;
+  tmdbLink: string | null;
+  episodes: Episode[];
+};
 
 export const dynamic = "force-dynamic";
 
 async function fetchContent() {
   try {
-    console.log("Fetching content from database...");
     const movies = await prisma.movie.findMany({ orderBy: { name: "asc" } });
     const series = await prisma.series.findMany({
       include: { episodes: true },
       orderBy: { name: "asc" },
     });
-    console.log("Content fetched successfully:", { movieCount: movies.length, seriesCount: series.length });
     return { movies, series, error: null };
   } catch (e: unknown) {
     const errorMessage = e instanceof Error ? e.message : "Failed to load content";
-    console.error("Error fetching content:", errorMessage);
     return { movies: [], series: [], error: errorMessage };
   } finally {
-    console.log("Disconnecting Prisma client...");
-    await prisma.$disconnect().catch((e) => console.error("Error disconnecting Prisma:", e));
+    await prisma.$disconnect();
   }
 }
 
@@ -61,10 +73,12 @@ export default async function ContentIndex() {
               {movies.map((movie: Movie) => (
                 <li key={movie.id} className="flex justify-between items-center p-2 border-b">
                   <span>
-                    {movie.name} ({movie.year})
+                    {movie.name} ({movie.year}) - {movie.language}
                   </span>
                   <Link href={`/edit-movie/${movie.id}`}>
-                    <button className="px-4 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700">Edit</button>
+                    <button className="px-4 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700">
+                      Edit
+                    </button>
                   </Link>
                 </li>
               ))}
@@ -77,9 +91,13 @@ export default async function ContentIndex() {
             <ul>
               {series.map((s: Series) => (
                 <li key={s.id} className="flex justify-between items-center p-2 border-b">
-                  <span>{s.name}</span>
+                  <span>
+                    {s.name} ({s.ott})
+                  </span>
                   <Link href={`/edit-series/${s.id}`}>
-                    <button className="px-4 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700">Edit</button>
+                    <button className="px-4 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700">
+                      Edit
+                    </button>
                   </Link>
                 </li>
               ))}

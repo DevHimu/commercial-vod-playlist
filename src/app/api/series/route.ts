@@ -1,35 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-type EpisodeInput = {
-  season: number;
-  episode: number;
-  streamUrl: string;
-};
-
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { name, language, imageUrl, tmdbLink, episodes }: { name: string; language: string; imageUrl: string; tmdbLink?: string; episodes: EpisodeInput[] } = await request.json();
+    const { name, ott, language, imageUrl, tmdbLink, episodes } = await req.json();
     const series = await prisma.series.create({
       data: {
         name,
-        language,
+        ott,
+        language: language || null,
         imageUrl,
-        tmdbLink,
+        tmdbLink: tmdbLink || null,
         episodes: {
-          create: episodes.map((ep: EpisodeInput) => ({
+          create: episodes.map((ep: { season: number; episode: number; streamUrl: string }) => ({
             season: ep.season,
             episode: ep.episode,
             streamUrl: ep.streamUrl,
           })),
         },
       },
-      include: { episodes: true },
     });
     return NextResponse.json(series, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Failed to add series" }, { status: 500 });
+  } catch (e) {
+    console.error("Error creating series:", e);
+    return NextResponse.json({ error: "Failed to create series" }, { status: 500 });
+  } finally {
+    await prisma.$disconnect();
   }
 }
