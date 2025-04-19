@@ -2,6 +2,8 @@
 
 A web application for managing a Video-on-Demand (VOD) M3U8 playlist with a dynamic admin panel. Users can add, edit, and view movies and series, generate a downloadable M3U8 playlist, and manage content via a secure admin interface. Built with modern web technologies and deployed on Vercel with a Neon Postgres database.
 
+![V1 Homepage](https://github.com/DevHimu/commercial-vod-playlist/blob/a15d16d15c6dfddfee96870f8898b2d87785bbb9/Repo-Images/homepage-v1.png)
+
 ## Technologies Used
 
 This project leverages the following technologies:
